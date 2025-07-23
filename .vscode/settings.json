@@ -1,0 +1,11 @@
+{
+    "java.compile.nullAnalysis.mode": "automatic",
+    "java.configuration.updateBuildConfiguration": "automatic",
+   "java.semanticHighlighting.enabled": true,
+   "editor.quickSuggestions": {
+      "other": true,
+      "comments": true,
+      "strings": true
+   },
+   "java.completion.enabled": true
+}
