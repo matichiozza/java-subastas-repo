@@ -119,7 +119,7 @@ public class PublicacionController {
         // Crear y guardar oferta
         Oferta oferta = new Oferta();
         oferta.setMonto(ofertaRequest.getMonto());
-        oferta.setFecha(java.time.LocalDate.now());
+        oferta.setFecha(new Date());
         oferta.setUsuario(usuario);
         oferta.setPublicacion(pub);
         ofertaRepository.save(oferta);

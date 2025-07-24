@@ -3,6 +3,7 @@ package com.example.demo.modelo;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
+import java.util.Date;
 
 @Entity
 public class Oferta {
@@ -16,7 +17,7 @@ public class Oferta {
     private float monto;
 
     @Column(name = "FECHA")
-    private LocalDate fecha;
+    private Date fecha;
 
     @ManyToOne
     @JoinColumn(name = "USUARIO_ID", nullable = false)
@@ -26,7 +27,7 @@ public class Oferta {
     @JoinColumn(name = "PUBLICACION_ID", nullable = false)
     private Publicacion publicacion;
 
-    public Oferta(float monto, LocalDate fecha, Usuario usuario, Publicacion publicacion) {
+    public Oferta(float monto, Date fecha, Usuario usuario, Publicacion publicacion) {
         this.monto = monto;
         this.fecha = fecha;
         this.usuario = usuario;
@@ -35,6 +36,14 @@ public class Oferta {
 
     public Oferta() {
 
+    }
+
+    public Date getFecha() {
+        return fecha;
+    }
+
+    public void setFecha(Date fecha) {
+        this.fecha = fecha;
     }
 
     // Getters y setters
@@ -54,13 +63,6 @@ public class Oferta {
         this.monto = monto;
     }
 
-    public LocalDate getFecha() {
-        return fecha;
-    }
-
-    public void setFecha(LocalDate fecha) {
-        this.fecha = fecha;
-    }
 
     public Usuario getUsuario() {
         return usuario;
