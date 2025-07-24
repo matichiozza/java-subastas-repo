@@ -7,6 +7,8 @@ import com.example.demo.modelo.Publicacion;
 import com.example.demo.modelo.Usuario;
 import com.example.demo.modelo.PublicacionRequest;
 import com.example.demo.modelo.Oferta;
+import com.example.demo.modelo.OfertaRequest;
+import com.example.demo.modelo.OfertaResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +23,7 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 import java.util.Optional;
+import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @RestController
 @RequestMapping("/publicaciones")
@@ -30,6 +33,7 @@ public class PublicacionController {
     private final PublicacionRepository publicacionRepository;
     private final UsuarioRepository usuarioRepository;
     private final OfertaRepository ofertaRepository;
+    private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<Publicacion> crearPublicacion(
@@ -87,6 +91,48 @@ public class PublicacionController {
         publicacion.setEstado("ACTIVO");
         Publicacion guardada = publicacionRepository.save(publicacion);
         return ResponseEntity.ok(guardada);
+    }
+
+    @PostMapping("/ofertas")
+    public ResponseEntity<?> crearOferta(@RequestBody OfertaRequest ofertaRequest, @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).body("No autenticado");
+        }
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty()) {
+            return ResponseEntity.status(401).body("Usuario no encontrado");
+        }
+        Usuario usuario = usuarioOpt.get();
+        Optional<Publicacion> pubOpt = publicacionRepository.findById(ofertaRequest.getPublicacionId());
+        if (pubOpt.isEmpty()) {
+            return ResponseEntity.badRequest().body("Publicación no encontrada");
+        }
+        Publicacion pub = pubOpt.get();
+        if (!"ACTIVO".equals(pub.getEstado())) {
+            return ResponseEntity.badRequest().body("La publicación no está activa");
+        }
+        float precioActual = pub.getPrecioActual() > 0 ? pub.getPrecioActual() : pub.getPrecioInicial();
+        float incremento = pub.getIncrementoMinimo() > 0 ? pub.getIncrementoMinimo() : 1;
+        if (ofertaRequest.getMonto() < precioActual + incremento) {
+            return ResponseEntity.badRequest().body("La oferta debe ser al menos $" + (precioActual + incremento));
+        }
+        // Crear y guardar oferta
+        Oferta oferta = new Oferta();
+        oferta.setMonto(ofertaRequest.getMonto());
+        oferta.setFecha(java.time.LocalDate.now());
+        oferta.setUsuario(usuario);
+        oferta.setPublicacion(pub);
+        ofertaRepository.save(oferta);
+        // Actualizar precio actual y total de ofertas
+        pub.setPrecioActual(ofertaRequest.getMonto());
+        pub.setOfertasTotales(pub.getOfertasTotales() + 1);
+        publicacionRepository.save(pub);
+        // Devolver publicación actualizada y ofertas
+        List<Oferta> ofertas = ofertaRepository.findByPublicacionIdOrderByFechaDesc(pub.getId());
+        OfertaResponse response = new OfertaResponse(pub, ofertas);
+        // Notificar a todos los clientes suscritos a la publicación
+        messagingTemplate.convertAndSend("/topic/publicacion." + pub.getId(), response);
+        return ResponseEntity.ok(response);
     }
 
     @GetMapping("/mias")
