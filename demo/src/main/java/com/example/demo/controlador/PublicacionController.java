@@ -2,9 +2,11 @@ package com.example.demo.controlador;
 
 import com.example.demo.datos.PublicacionRepository;
 import com.example.demo.datos.UsuarioRepository;
+import com.example.demo.datos.OfertaRepository;
 import com.example.demo.modelo.Publicacion;
 import com.example.demo.modelo.Usuario;
 import com.example.demo.modelo.PublicacionRequest;
+import com.example.demo.modelo.Oferta;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -27,6 +29,7 @@ import java.util.Optional;
 public class PublicacionController {
     private final PublicacionRepository publicacionRepository;
     private final UsuarioRepository usuarioRepository;
+    private final OfertaRepository ofertaRepository;
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<Publicacion> crearPublicacion(
@@ -106,6 +109,21 @@ public class PublicacionController {
     @GetMapping
     public List<Publicacion> todasPublicaciones() {
         return publicacionRepository.findAll();
+    }
+
+    @GetMapping("/{id}")
+    public ResponseEntity<Publicacion> obtenerPublicacionPorId(@PathVariable Integer id) {
+        Optional<Publicacion> pubOpt = publicacionRepository.findById(id);
+        if (pubOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        return ResponseEntity.ok(pubOpt.get());
+    }
+
+    @GetMapping("/{id}/ofertas")
+    public ResponseEntity<List<Oferta>> obtenerOfertasPorPublicacion(@PathVariable Integer id) {
+        List<Oferta> ofertas = ofertaRepository.findByPublicacionIdOrderByFechaDesc(id);
+        return ResponseEntity.ok(ofertas);
     }
 
     @DeleteMapping("/{id}")
