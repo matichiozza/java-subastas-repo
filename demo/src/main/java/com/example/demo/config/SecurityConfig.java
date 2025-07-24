@@ -39,6 +39,7 @@ public class SecurityConfig {
                         authRequest
                                 .requestMatchers("/auth/**").permitAll()
                                 .requestMatchers("/uploads/**").permitAll()
+                                .requestMatchers("/ws/**", "/topic/**").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .sessionManagement(sessionManager -> sessionManager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
