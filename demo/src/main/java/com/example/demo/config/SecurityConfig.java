@@ -40,6 +40,7 @@ public class SecurityConfig {
                                 .requestMatchers("/auth/**").permitAll()
                                 .requestMatchers("/uploads/**").permitAll()
                                 .requestMatchers("/ws/**", "/topic/**").permitAll()
+                                .requestMatchers(org.springframework.http.HttpMethod.GET, "/publicaciones", "/publicaciones/**").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .sessionManagement(sessionManager -> sessionManager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
