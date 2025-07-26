@@ -178,6 +178,54 @@ public class PublicacionController {
         return ofertaOpt.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
     }
 
+    @DeleteMapping("/{publicacionId}/ofertas/usuario/{usuarioId}")
+    public ResponseEntity<?> eliminarOfertasUsuario(@PathVariable Integer publicacionId, @PathVariable Integer usuarioId, @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        
+        // Verificar que el usuario autenticado es el mismo que quiere eliminar sus ofertas
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty() || usuarioOpt.get().getId() != usuarioId) {
+            return ResponseEntity.status(403).build();
+        }
+        
+        // Verificar que la publicación existe
+        Optional<Publicacion> publicacionOpt = publicacionRepository.findById(publicacionId);
+        if (publicacionOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        // Eliminar todas las ofertas del usuario en esta publicación
+        List<Oferta> ofertasAEliminar = ofertaRepository.findByPublicacionIdAndUsuarioId(publicacionId, usuarioId);
+        if (ofertasAEliminar.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        ofertaRepository.deleteAll(ofertasAEliminar);
+        
+        // Actualizar el precio actual de la publicación si es necesario
+        Publicacion publicacion = publicacionOpt.get();
+        List<Oferta> ofertasRestantes = ofertaRepository.findByPublicacionIdOrderByFechaDesc(publicacionId);
+        
+        if (ofertasRestantes.isEmpty()) {
+            // Si no quedan ofertas, volver al precio inicial
+            publicacion.setPrecioActual(publicacion.getPrecioInicial());
+        } else {
+            // Si quedan ofertas, usar la más alta
+            publicacion.setPrecioActual(ofertasRestantes.get(0).getMonto());
+        }
+        
+        publicacion.setOfertasTotales(ofertasRestantes.size());
+        publicacionRepository.save(publicacion);
+        
+        // Notificar a todos los clientes suscritos
+        OfertaResponse response = new OfertaResponse(publicacion, ofertasRestantes);
+        messagingTemplate.convertAndSend("/topic/publicacion." + publicacionId, response);
+        
+        return ResponseEntity.ok().build();
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarPublicacion(@PathVariable Integer id, @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
