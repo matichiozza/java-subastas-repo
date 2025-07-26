@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 .requestMatchers("/uploads/**").permitAll()
                                 .requestMatchers("/ws/**", "/topic/**").permitAll()
                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/publicaciones", "/publicaciones/**").permitAll()
+                                .requestMatchers("/publicaciones/*/ofertas/usuario/*").permitAll()
                                 .requestMatchers("/tarjetas/**").permitAll()
                                 .anyRequest().authenticated()
                 )

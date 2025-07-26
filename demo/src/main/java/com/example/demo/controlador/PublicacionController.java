@@ -172,6 +172,12 @@ public class PublicacionController {
         return ResponseEntity.ok(ofertas);
     }
 
+    @GetMapping("/{publicacionId}/ofertas/usuario/{usuarioId}")
+    public ResponseEntity<Oferta> obtenerOfertaAnteriorUsuario(@PathVariable Integer publicacionId, @PathVariable Integer usuarioId) {
+        Optional<Oferta> ofertaOpt = ofertaRepository.findFirstByPublicacionIdAndUsuarioIdOrderByFechaDesc(publicacionId, usuarioId);
+        return ofertaOpt.map(ResponseEntity::ok).orElse(ResponseEntity.notFound().build());
+    }
+
     @DeleteMapping("/{id}")
     public ResponseEntity<Void> eliminarPublicacion(@PathVariable Integer id, @AuthenticationPrincipal UserDetails userDetails) {
         if (userDetails == null) {
