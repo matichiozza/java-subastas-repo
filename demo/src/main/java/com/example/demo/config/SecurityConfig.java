@@ -41,6 +41,7 @@ public class SecurityConfig {
                                 .requestMatchers("/uploads/**").permitAll()
                                 .requestMatchers("/ws/**", "/topic/**").permitAll()
                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/publicaciones", "/publicaciones/**").permitAll()
+                                .requestMatchers("/tarjetas/**").permitAll()
                                 .anyRequest().authenticated()
                 )
                 .sessionManagement(sessionManager -> sessionManager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
@@ -52,7 +53,7 @@ public class SecurityConfig {
     @Bean
     public CorsConfigurationSource corsConfigurationSource() {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOrigins(Arrays.asList("http://localhost:3000"));
+        configuration.setAllowedOriginPatterns(Arrays.asList("http://localhost:3000", "http://localhost:3001"));
         configuration.setAllowedMethods(Arrays.asList("GET", "POST", "PUT", "DELETE", "OPTIONS"));
         configuration.setAllowedHeaders(Arrays.asList("*"));
         configuration.setAllowCredentials(true);

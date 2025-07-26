@@ -1,5 +1,6 @@
 package com.example.demo.modelo;
 
+import com.fasterxml.jackson.annotation.JsonManagedReference;
 import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.security.core.GrantedAuthority;
@@ -53,9 +54,16 @@ public class Usuario implements UserDetails {
     @Enumerated(EnumType.STRING)
     Role role;
 
+    @JsonManagedReference
+    @OneToMany(mappedBy = "usuario", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    private List<Tarjeta> tarjetas;
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        return List.of(new SimpleGrantedAuthority((role.name())));
+        if (role == null) {
+            return List.of(new SimpleGrantedAuthority("USER"));
+        }
+        return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
     @Override
