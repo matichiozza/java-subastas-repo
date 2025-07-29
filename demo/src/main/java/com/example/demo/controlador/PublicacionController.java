@@ -55,7 +55,9 @@ public class PublicacionController {
         Date fechaFin = publicacionRequest.getFechaFin();
         Date hoy = new Date();
         // Resetear la hora de hoy a 00:00:00 para comparar solo fechas
-        hoy.setHours(0, 0, 0, 0);
+        hoy.setHours(0);
+        hoy.setMinutes(0);
+        hoy.setSeconds(0);
         
         if (fechaFin != null && fechaFin.before(hoy)) {
             return ResponseEntity.badRequest().body(null);
