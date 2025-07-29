@@ -13,17 +13,17 @@ public class Publicacion {
     @Column(name = "ID")
     private int id;
 
-    @Column(name = "TITULO")
+    @Column(name = "TITULO", length = 200)
     private String titulo;
 
-    @Column(name = "DESCRIPCION")
+    @Column(name = "DESCRIPCION", length = 3000)
     private String descripcion;
 
     @Enumerated(EnumType.STRING)
     @Column(name = "CATEGORIA")
     private Categoria categoria;
 
-    @Column(name = "ESTADO")
+    @Column(name = "ESTADO", length = 50)
     private String estado = "ACTIVO";
 
     @Column(name = "FECHA_INICIO")
@@ -37,7 +37,7 @@ public class Publicacion {
     @Column(name = "imagen")
     private List<String> imagenes;
 
-    @Column(name = "CONDICION")
+    @Column(name = "CONDICION", length = 100)
     private String condicion;
 
     @Column(name = "PRECIO_INICIAL")
@@ -70,7 +70,7 @@ public class Publicacion {
     @Column(name = "MOTIVO_CANCELACION")
     private MotivoCancelacion motivoCancelacion;
 
-    @Column(name = "COMENTARIO_CANCELACION")
+    @Column(name = "COMENTARIO_CANCELACION", length = 500)
     private String comentarioCancelacion;
 
     public Publicacion(String titulo, String descripcion, Categoria categoria, String estado, Date fechaInicio, Date fechaFin, String condicion, float precioInicial, float incrementoMinimo, Usuario usuario) {
