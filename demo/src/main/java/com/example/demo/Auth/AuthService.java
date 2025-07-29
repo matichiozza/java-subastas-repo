@@ -1,6 +1,5 @@
 package com.example.demo.Auth;
 
-
 import com.example.demo.datos.UsuarioRepository;
 import com.example.demo.jwt.JwtService;
 import com.example.demo.modelo.Role;
@@ -11,7 +10,6 @@ import org.springframework.security.authentication.UsernamePasswordAuthenticatio
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-
 
 @Service
 @RequiredArgsConstructor

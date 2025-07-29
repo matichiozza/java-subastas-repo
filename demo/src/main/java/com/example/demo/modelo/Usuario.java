@@ -19,56 +19,53 @@ import java.util.List;
 public class Usuario implements UserDetails {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private int id;
+    private Integer id;
 
-    @Column(name = "NOMBRE")
+    @Column(nullable = false)
     private String nombre;
 
-    @Column(name = "USERNAME", nullable = false)
+    @Column(unique = true, nullable = false)
     private String username;
 
-    @Column(name = "PASSWORD")
+    @Column(nullable = false)
     private String password;
 
-    @Column(name = "FOTO_PERFIL")
+    @Column
     private String fotoPerfil;
 
-    @Column(name = "DIRECCION")
+    @Column
     private String direccion;
 
-    @Column(name = "CIUDAD")
+    @Column
     private String ciudad;
 
-    @Column(name = "CODIGO_POSTAL")
+    @Column
     private String codigoPostal;
 
-    @Column(name = "PAIS")
+    @Column
     private String pais;
 
-    @Column(name = "LATITUD")
+    @Column
     private double latitud;
 
-    @Column(name = "LONGITUD")
+    @Column
     private double longitud;
 
     @Enumerated(EnumType.STRING)
-    Role role;
+    private Role role;
 
+    @OneToMany(mappedBy = "usuario", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     @JsonManagedReference
-    @OneToMany(mappedBy = "usuario", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Tarjeta> tarjetas;
 
-    @Column(name = "SANCIONES_DISPONIBLES")
-    private int sancionesDisponibles = 2; // Máximo 2 sanciones por cuenta
+    @Column
+    private int sancionesDisponibles = 2;
 
-    @Column(name = "ENABLED")
-    private boolean enabled = true; // Estado de la cuenta (activa/inactiva)
+    @Column
+    private boolean enabled = true;
 
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
-        if (role == null) {
-            return List.of(new SimpleGrantedAuthority("USER"));
-        }
         return List.of(new SimpleGrantedAuthority(role.name()));
     }
 
