@@ -1,5 +1,6 @@
 package com.example.demo.modelo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 
 import java.time.LocalDate;
@@ -21,10 +22,12 @@ public class Oferta {
 
     @ManyToOne
     @JoinColumn(name = "USUARIO_ID", nullable = false)
+    @JsonIgnoreProperties({"tarjetas", "password", "enabled", "accountNonExpired", "accountNonLocked", "credentialsNonExpired"})
     private Usuario usuario;
 
     @ManyToOne
     @JoinColumn(name = "PUBLICACION_ID", nullable = false)
+    @JsonIgnoreProperties({"ofertas"})
     private Publicacion publicacion;
 
     public Oferta(float monto, Date fecha, Usuario usuario, Publicacion publicacion) {

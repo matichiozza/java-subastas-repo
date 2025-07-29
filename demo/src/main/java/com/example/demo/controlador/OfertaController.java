@@ -5,13 +5,14 @@ import com.example.demo.datos.OfertaRepository;
 import com.example.demo.modelo.Oferta;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
 @RestController
 @RequestMapping("/ofertas")
-@CrossOrigin(origins = "*")
+@CrossOrigin(originPatterns = {"http://localhost:3000", "http://localhost:3001"})
 public class OfertaController {
 
     @Autowired
@@ -21,6 +22,7 @@ public class OfertaController {
     private OfertaRepository ofertaRepository;
 
     @GetMapping("/mis-ofertas")
+    @Transactional(readOnly = true)
     public ResponseEntity<List<Oferta>> getMisOfertas() {
         try {
             // Por ahora, devolver todas las ofertas para testing

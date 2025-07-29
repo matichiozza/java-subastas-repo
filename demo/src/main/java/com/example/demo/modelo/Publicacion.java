@@ -1,5 +1,6 @@
 package com.example.demo.modelo;
 
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import java.util.Date;
 import com.example.demo.modelo.Categoria;
@@ -60,10 +61,12 @@ public class Publicacion {
 
     @ManyToOne
     @JoinColumn(name = "USUARIO_ID", nullable = false)
+    @JsonIgnoreProperties({"tarjetas", "password", "enabled", "accountNonExpired", "accountNonLocked", "credentialsNonExpired"})
     private Usuario usuario;
 
     @ManyToOne
     @JoinColumn(name = "GANADOR_ID")
+    @JsonIgnoreProperties({"tarjetas", "password", "enabled", "accountNonExpired", "accountNonLocked", "credentialsNonExpired"})
     private Usuario ganador;
 
     @Enumerated(EnumType.STRING)

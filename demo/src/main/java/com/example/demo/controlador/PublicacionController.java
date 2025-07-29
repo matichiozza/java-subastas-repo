@@ -29,7 +29,7 @@ import org.springframework.messaging.simp.SimpMessagingTemplate;
 
 @RestController
 @RequestMapping("/publicaciones")
-@CrossOrigin(origins = "http://localhost:3000")
+@CrossOrigin(originPatterns = {"http://localhost:3000", "http://localhost:3001"})
 @RequiredArgsConstructor
 public class PublicacionController {
     private final PublicacionRepository publicacionRepository;
