@@ -66,6 +66,13 @@ public class Publicacion {
     @JoinColumn(name = "GANADOR_ID")
     private Usuario ganador;
 
+    @Enumerated(EnumType.STRING)
+    @Column(name = "MOTIVO_CANCELACION")
+    private MotivoCancelacion motivoCancelacion;
+
+    @Column(name = "COMENTARIO_CANCELACION")
+    private String comentarioCancelacion;
+
     public Publicacion(String titulo, String descripcion, Categoria categoria, String estado, Date fechaInicio, Date fechaFin, String condicion, float precioInicial, float incrementoMinimo, Usuario usuario) {
         this.titulo = titulo;
         this.descripcion = descripcion;
@@ -218,5 +225,21 @@ public class Publicacion {
 
     public void setGanador(Usuario ganador) {
         this.ganador = ganador;
+    }
+
+    public MotivoCancelacion getMotivoCancelacion() {
+        return motivoCancelacion;
+    }
+
+    public void setMotivoCancelacion(MotivoCancelacion motivoCancelacion) {
+        this.motivoCancelacion = motivoCancelacion;
+    }
+
+    public String getComentarioCancelacion() {
+        return comentarioCancelacion;
+    }
+
+    public void setComentarioCancelacion(String comentarioCancelacion) {
+        this.comentarioCancelacion = comentarioCancelacion;
     }
 }

@@ -9,6 +9,8 @@ import com.example.demo.modelo.PublicacionRequest;
 import com.example.demo.modelo.Oferta;
 import com.example.demo.modelo.OfertaRequest;
 import com.example.demo.modelo.OfertaResponse;
+import com.example.demo.modelo.CancelacionRequest;
+import com.example.demo.modelo.MotivoCancelacion;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -19,9 +21,9 @@ import org.springframework.util.StringUtils;
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-
 import java.util.Date;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 
@@ -48,6 +50,16 @@ public class PublicacionController {
             return ResponseEntity.status(401).build();
         }
         Usuario usuario = usuarioOpt.get();
+
+        // Validar fecha de finalización
+        Date fechaFin = publicacionRequest.getFechaFin();
+        Date hoy = new Date();
+        // Resetear la hora de hoy a 00:00:00 para comparar solo fechas
+        hoy.setHours(0, 0, 0, 0);
+        
+        if (fechaFin != null && fechaFin.before(hoy)) {
+            return ResponseEntity.badRequest().body(null);
+        }
 
         // Validar imágenes
         final long MAX_SIZE = 10 * 1024 * 1024; // 10MB
@@ -130,8 +142,17 @@ public class PublicacionController {
         // Devolver publicación actualizada y ofertas
         List<Oferta> ofertas = ofertaRepository.findByPublicacionIdOrderByFechaDesc(pub.getId());
         OfertaResponse response = new OfertaResponse(pub, ofertas);
+        
         // Notificar a todos los clientes suscritos a la publicación
         messagingTemplate.convertAndSend("/topic/publicacion." + pub.getId(), response);
+        
+        // Enviar actualización general para todos los clientes
+        Map<String, Object> updateMessage = Map.of(
+            "type", "oferta_actualizada",
+            "publicacion", pub
+        );
+        messagingTemplate.convertAndSend("/topic/publicaciones", updateMessage);
+        
         return ResponseEntity.ok(response);
     }
 
@@ -223,7 +244,190 @@ public class PublicacionController {
         OfertaResponse response = new OfertaResponse(publicacion, ofertasRestantes);
         messagingTemplate.convertAndSend("/topic/publicacion." + publicacionId, response);
         
+        // Enviar actualización general para todos los clientes
+        Map<String, Object> updateMessage = Map.of(
+            "type", "oferta_actualizada",
+            "publicacion", publicacion
+        );
+        messagingTemplate.convertAndSend("/topic/publicaciones", updateMessage);
+        
         return ResponseEntity.ok().build();
+    }
+
+
+
+    @PostMapping("/{id}/cancelar")
+    public ResponseEntity<?> cancelarPublicacion(
+            @PathVariable Integer id, 
+            @RequestBody CancelacionRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        
+        Optional<Publicacion> pubOpt = publicacionRepository.findById(id);
+        if (pubOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        Publicacion pub = pubOpt.get();
+        // Solo el dueño puede cancelar
+        if (pub.getUsuario() == null || !pub.getUsuario().getUsername().equals(userDetails.getUsername())) {
+            return ResponseEntity.status(403).build();
+        }
+        
+        // Verificar si ya está cancelada
+        if ("CANCELADO".equals(pub.getEstado())) {
+            return ResponseEntity.badRequest().body("La publicación ya está cancelada");
+        }
+        
+        // Obtener el usuario actual
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty()) {
+            return ResponseEntity.status(401).build();
+        }
+        Usuario usuario = usuarioOpt.get();
+        
+        // Verificar si hay ofertas activas
+        boolean tieneOfertas = pub.getOfertasTotales() > 0;
+        
+        // Si tiene ofertas, verificar sanciones disponibles
+        if (tieneOfertas && usuario.getSancionesDisponibles() <= 0) {
+            // Eliminar permanentemente la cuenta del usuario
+            usuarioRepository.deleteById(usuario.getId());
+            return ResponseEntity.status(401).body(Map.of(
+                "mensaje", "Tu cuenta ha sido eliminada permanentemente por cancelar una publicación con ofertas activas sin sanciones disponibles",
+                "cuentaEliminada", true
+            ));
+        }
+        
+        // Aplicar sanción si tiene ofertas
+        if (tieneOfertas) {
+            usuario.setSancionesDisponibles(usuario.getSancionesDisponibles() - 1);
+            usuarioRepository.save(usuario);
+        }
+        
+        // Eliminar todas las ofertas asociadas a la publicación primero
+        List<Oferta> ofertasAEliminar = ofertaRepository.findByPublicacionIdOrderByFechaDesc(id);
+        if (!ofertasAEliminar.isEmpty()) {
+            ofertaRepository.deleteAll(ofertasAEliminar);
+        }
+        
+        // Eliminar imágenes del disco
+        if (pub.getImagenes() != null) {
+            for (String ruta : pub.getImagenes()) {
+                try {
+                    String absPath = System.getProperty("user.dir") + ruta.replace("/", File.separator);
+                    File f = new File(absPath);
+                    if (f.exists()) f.delete();
+                } catch (Exception ignored) {}
+            }
+        }
+        
+        // Ahora eliminar la publicación (ya no hay ofertas que la referencien)
+        publicacionRepository.deleteById(id);
+        
+        return ResponseEntity.ok(Map.of(
+            "mensaje", "Publicación cancelada y eliminada exitosamente",
+            "sancionAplicada", tieneOfertas,
+            "sancionesRestantes", usuario.getSancionesDisponibles()
+        ));
+    }
+
+    @GetMapping("/usuario/sanciones")
+    public ResponseEntity<Map<String, Object>> obtenerSancionesUsuario(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty()) {
+            return ResponseEntity.status(401).build();
+        }
+        
+        Usuario usuario = usuarioOpt.get();
+        
+        // Verificar si el usuario tiene 0 sanciones y eliminarlo automáticamente
+        if (usuario.getSancionesDisponibles() <= 0) {
+            // Eliminar todas las ofertas del usuario
+            List<Oferta> ofertasUsuario = ofertaRepository.findByUsuarioId(usuario.getId());
+            if (!ofertasUsuario.isEmpty()) {
+                ofertaRepository.deleteAll(ofertasUsuario);
+            }
+            
+            // Eliminar todas las publicaciones del usuario
+            List<Publicacion> publicacionesUsuario = publicacionRepository.findByUsuarioId(usuario.getId());
+            if (!publicacionesUsuario.isEmpty()) {
+                publicacionRepository.deleteAll(publicacionesUsuario);
+            }
+            
+            // Eliminar el usuario
+            usuarioRepository.deleteById(usuario.getId());
+            
+            return ResponseEntity.status(401).body(Map.of(
+                "mensaje", "Tu cuenta ha sido eliminada por tener 0 sanciones disponibles",
+                "cuentaEliminada", true
+            ));
+        }
+        
+        return ResponseEntity.ok(Map.of(
+            "sancionesDisponibles", usuario.getSancionesDisponibles(),
+            "maximoSanciones", 2
+        ));
+    }
+
+    @PostMapping("/{id}/sincronizar-ofertas")
+    public ResponseEntity<Publicacion> sincronizarOfertas(@PathVariable Integer id) {
+        Optional<Publicacion> pubOpt = publicacionRepository.findById(id);
+        if (pubOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        Publicacion pub = pubOpt.get();
+        List<Oferta> ofertas = ofertaRepository.findByPublicacionIdOrderByFechaDesc(id);
+        pub.setOfertasTotales(ofertas.size());
+        
+        // Actualizar precio actual si hay ofertas
+        if (!ofertas.isEmpty()) {
+            pub.setPrecioActual(ofertas.get(0).getMonto());
+        } else {
+            pub.setPrecioActual(pub.getPrecioInicial());
+        }
+        
+        Publicacion actualizada = publicacionRepository.save(pub);
+        return ResponseEntity.ok(actualizada);
+    }
+
+    @PostMapping("/limpiar-usuarios-sin-sanciones")
+    public ResponseEntity<Map<String, Object>> limpiarUsuariosSinSanciones() {
+        // Buscar usuarios con 0 sanciones
+        List<Usuario> usuariosSinSanciones = usuarioRepository.findBySancionesDisponiblesLessThanEqual(0);
+        
+        int usuariosEliminados = 0;
+        
+        for (Usuario usuario : usuariosSinSanciones) {
+            // Eliminar ofertas del usuario
+            List<Oferta> ofertasUsuario = ofertaRepository.findByUsuarioId(usuario.getId());
+            if (!ofertasUsuario.isEmpty()) {
+                ofertaRepository.deleteAll(ofertasUsuario);
+            }
+            
+            // Eliminar publicaciones del usuario
+            List<Publicacion> publicacionesUsuario = publicacionRepository.findByUsuarioId(usuario.getId());
+            if (!publicacionesUsuario.isEmpty()) {
+                publicacionRepository.deleteAll(publicacionesUsuario);
+            }
+            
+            // Eliminar el usuario
+            usuarioRepository.deleteById(usuario.getId());
+            usuariosEliminados++;
+        }
+        
+        return ResponseEntity.ok(Map.of(
+            "mensaje", "Limpieza completada",
+            "usuariosEliminados", usuariosEliminados,
+            "usuariosEncontrados", usuariosSinSanciones.size()
+        ));
     }
 
     @DeleteMapping("/{id}")
@@ -240,6 +444,12 @@ public class PublicacionController {
         if (pub.getUsuario() == null || !pub.getUsuario().getUsername().equals(userDetails.getUsername())) {
             return ResponseEntity.status(403).build();
         }
+        // Eliminar todas las ofertas asociadas a la publicación primero
+        List<Oferta> ofertasAEliminar = ofertaRepository.findByPublicacionIdOrderByFechaDesc(id);
+        if (!ofertasAEliminar.isEmpty()) {
+            ofertaRepository.deleteAll(ofertasAEliminar);
+        }
+        
         // Borrar imágenes del disco
         if (pub.getImagenes() != null) {
             for (String ruta : pub.getImagenes()) {
@@ -250,6 +460,8 @@ public class PublicacionController {
                 } catch (Exception ignored) {}
             }
         }
+        
+        // Ahora eliminar la publicación (ya no hay ofertas que la referencien)
         publicacionRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

@@ -58,6 +58,12 @@ public class Usuario implements UserDetails {
     @OneToMany(mappedBy = "usuario", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<Tarjeta> tarjetas;
 
+    @Column(name = "SANCIONES_DISPONIBLES")
+    private int sancionesDisponibles = 2; // Máximo 2 sanciones por cuenta
+
+    @Column(name = "ENABLED")
+    private boolean enabled = true; // Estado de la cuenta (activa/inactiva)
+
     @Override
     public Collection<? extends GrantedAuthority> getAuthorities() {
         if (role == null) {
@@ -83,7 +89,7 @@ public class Usuario implements UserDetails {
 
     @Override
     public boolean isEnabled() {
-        return true;
+        return enabled;
     }
 }
 

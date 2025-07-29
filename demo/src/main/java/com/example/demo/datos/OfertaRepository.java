@@ -12,4 +12,5 @@ public interface OfertaRepository extends JpaRepository<Oferta, Integer> {
     List<Oferta> findByPublicacionIdOrderByFechaDesc(Integer publicacionId);
     Optional<Oferta> findFirstByPublicacionIdAndUsuarioIdOrderByFechaDesc(Integer publicacionId, Integer usuarioId);
     List<Oferta> findByPublicacionIdAndUsuarioId(Integer publicacionId, Integer usuarioId);
+    List<Oferta> findByUsuarioId(Integer usuarioId);
 }

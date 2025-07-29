@@ -37,11 +37,12 @@ public class AuthService {
                 .username(request.getUsername())
                 .password(passwordEncoder.encode(request.getPassword())) // Si usas un encoder
                 .nombre(request.getNombre())
-                .ciudad(request.getCiudad())
                 .direccion(request.getDireccion())
-                .pais(request.getPais())
-                .codigoPostal(request.getCodigoPostal())
+                .latitud(request.getLatitud())
+                .longitud(request.getLongitud())
                 .role(Role.USER)
+                .sancionesDisponibles(2) // Usuarios nuevos empiezan con 2 sanciones
+                .enabled(true) // Cuenta activa por defecto
                 .build();
 
         usuarioRepository.save(usuario);

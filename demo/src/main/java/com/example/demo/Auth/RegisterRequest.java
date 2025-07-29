@@ -14,8 +14,6 @@ public class RegisterRequest {
     private String password;
     private String nombre;
     private String direccion;
-    private String ciudad;
-    private String codigoPostal;
-    private String pais;
-
+    private String latitud;
+    private String longitud;
 }
