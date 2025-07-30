@@ -2,13 +2,18 @@ package com.example.demo.controlador;
 
 import com.example.demo.datos.OfertaDAO;
 import com.example.demo.datos.OfertaRepository;
+import com.example.demo.datos.UsuarioRepository;
 import com.example.demo.modelo.Oferta;
+import com.example.demo.modelo.Usuario;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import java.util.Optional;
 
 @RestController
 @RequestMapping("/ofertas")
@@ -21,22 +26,28 @@ public class OfertaController {
     @Autowired
     private OfertaRepository ofertaRepository;
 
+    @Autowired
+    private UsuarioRepository usuarioRepository;
+
     @GetMapping("/mis-ofertas")
     @Transactional(readOnly = true)
-    public ResponseEntity<List<Oferta>> getMisOfertas() {
-        try {
-            // Por ahora, devolver todas las ofertas para testing
-            // En producción, esto debería filtrar por usuario autenticado
-            List<Oferta> ofertas = ofertaDAO.getAllOfertas();
-            
-            // Ordenar por fecha descendente (más recientes primero)
-            ofertas.sort((o1, o2) -> o2.getFecha().compareTo(o1.getFecha()));
-            
-            return ResponseEntity.ok(ofertas);
-        } catch (Exception e) {
-            e.printStackTrace();
-            return ResponseEntity.badRequest().build();
+    public ResponseEntity<List<Oferta>> getMisOfertas(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
         }
+        
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty()) {
+            return ResponseEntity.status(401).build();
+        }
+        
+        Usuario usuario = usuarioOpt.get();
+        List<Oferta> ofertas = ofertaRepository.findHighestOfertaByUsuarioPerPublicacion(usuario.getId());
+        
+        // Ordenar por fecha descendente (más recientes primero)
+        ofertas.sort((o1, o2) -> o2.getFecha().compareTo(o1.getFecha()));
+        
+        return ResponseEntity.ok(ofertas);
     }
 
     @GetMapping("/publicacion/{publicacionId}")
