@@ -11,5 +11,6 @@ import java.util.Optional;
 public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
 
     Optional<Usuario> findByUsername(String username);
+    Optional<Usuario> findByDni(String dni);
     List<Usuario> findBySancionesDisponiblesLessThanEqual(int sanciones);
 }

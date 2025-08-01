@@ -45,27 +45,72 @@ public class UsuarioController {
     public ResponseEntity<Usuario> actualizarFotoPerfil(
             @RequestPart("fotoPerfil") MultipartFile fotoPerfil,
             @AuthenticationPrincipal UserDetails userDetails) throws IOException {
-        if (userDetails == null) return ResponseEntity.status(401).build();
+        System.out.println("=== Iniciando actualización de foto de perfil ===");
+        System.out.println("Usuario: " + (userDetails != null ? userDetails.getUsername() : "null"));
+        
+        if (userDetails == null) {
+            System.out.println("Error: UserDetails es null");
+            return ResponseEntity.status(401).build();
+        }
+        
         Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
-        if (usuarioOpt.isEmpty()) return ResponseEntity.status(401).build();
+        if (usuarioOpt.isEmpty()) {
+            System.out.println("Error: Usuario no encontrado");
+            return ResponseEntity.status(401).build();
+        }
+        
         Usuario usuario = usuarioOpt.get();
+        System.out.println("Usuario encontrado: " + usuario.getUsername());
+        
         // Validar imagen
         final long MAX_SIZE = 10 * 1024 * 1024; // 10MB
         final String[] allowedTypes = {"image/jpeg", "image/png", "image/webp", "image/gif"};
+        
+        System.out.println("Archivo recibido:");
+        System.out.println("- Nombre: " + fotoPerfil.getOriginalFilename());
+        System.out.println("- Tipo: " + fotoPerfil.getContentType());
+        System.out.println("- Tamaño: " + fotoPerfil.getSize() + " bytes");
+        
         boolean tipoValido = false;
-        for (String t : allowedTypes) if (t.equals(fotoPerfil.getContentType())) tipoValido = true;
-        if (!tipoValido) return ResponseEntity.badRequest().build();
-        if (fotoPerfil.getSize() > MAX_SIZE) return ResponseEntity.badRequest().build();
+        for (String t : allowedTypes) {
+            if (t.equals(fotoPerfil.getContentType())) {
+                tipoValido = true;
+                break;
+            }
+        }
+        
+        if (!tipoValido) {
+            System.out.println("Error: Tipo de archivo no válido: " + fotoPerfil.getContentType());
+            return ResponseEntity.badRequest().build();
+        }
+        
+        if (fotoPerfil.getSize() > MAX_SIZE) {
+            System.out.println("Error: Archivo demasiado grande: " + fotoPerfil.getSize() + " bytes");
+            return ResponseEntity.badRequest().build();
+        }
+        
         // Guardar imagen
         String nombreArchivo = System.currentTimeMillis() + "_" + StringUtils.cleanPath(fotoPerfil.getOriginalFilename());
         String rutaRelativa = "/uploads/" + nombreArchivo;
         String uploadDir = System.getProperty("user.dir") + File.separator + "uploads";
         String rutaAbsoluta = uploadDir + File.separator + nombreArchivo;
+        
+        System.out.println("Guardando archivo:");
+        System.out.println("- Ruta relativa: " + rutaRelativa);
+        System.out.println("- Ruta absoluta: " + rutaAbsoluta);
+        
         File dest = new File(rutaAbsoluta);
         dest.getParentFile().mkdirs();
         fotoPerfil.transferTo(dest);
+        
+        System.out.println("Archivo guardado exitosamente");
+        
         usuario.setFotoPerfil(rutaRelativa);
         usuarioRepository.save(usuario);
+        
+        System.out.println("Usuario actualizado con nueva foto: " + usuario.getFotoPerfil());
+        System.out.println("=== Fin actualización de foto de perfil ===");
+        
         return ResponseEntity.ok(usuario);
     }
 } 

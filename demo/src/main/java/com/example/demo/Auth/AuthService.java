@@ -31,6 +31,18 @@ public class AuthService {
     }
 
     public AuthResponse register(RegisterRequest request) {
+        // Validar que el DNI no esté duplicado (solo si se proporciona)
+        if (request.getDni() != null && !request.getDni().trim().isEmpty()) {
+            if (usuarioRepository.findByDni(request.getDni()).isPresent()) {
+                throw new RuntimeException("El DNI ya está registrado en el sistema");
+            }
+        }
+        
+        // Validar que el username no esté duplicado
+        if (usuarioRepository.findByUsername(request.getUsername()).isPresent()) {
+            throw new RuntimeException("El nombre de usuario ya está en uso");
+        }
+        
         // Convertir latitud y longitud de String a double
         double latitud = 0.0;
         double longitud = 0.0;
@@ -50,6 +62,7 @@ public class AuthService {
 
         Usuario usuario = Usuario.builder()
                 .username(request.getUsername())
+                .dni(request.getDni())
                 .password(passwordEncoder.encode(request.getPassword())) // Si usas un encoder
                 .nombre(request.getNombre())
                 .direccion(request.getDireccion())

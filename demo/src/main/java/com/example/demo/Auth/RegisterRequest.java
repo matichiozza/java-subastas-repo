@@ -13,6 +13,7 @@ public class RegisterRequest {
     private String username;
     private String password;
     private String nombre;
+    private String dni;
     private String direccion;
     private String latitud;
     private String longitud;
