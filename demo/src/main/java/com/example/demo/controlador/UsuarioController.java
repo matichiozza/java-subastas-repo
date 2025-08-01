@@ -1,6 +1,7 @@
 package com.example.demo.controlador;
 
 import com.example.demo.datos.UsuarioRepository;
+import com.example.demo.modelo.CbuRequest;
 import com.example.demo.modelo.Usuario;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -111,6 +112,51 @@ public class UsuarioController {
         System.out.println("Usuario actualizado con nueva foto: " + usuario.getFotoPerfil());
         System.out.println("=== Fin actualización de foto de perfil ===");
         
+        return ResponseEntity.ok(usuario);
+    }
+
+    // Agregar CBU
+    @PostMapping("/cbu")
+    public ResponseEntity<Usuario> agregarCbu(
+            @RequestBody CbuRequest cbuRequest,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) return ResponseEntity.status(401).build();
+        
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty()) return ResponseEntity.status(401).build();
+        
+        Usuario usuario = usuarioOpt.get();
+        
+        String cbu = cbuRequest.getCbu();
+        
+        // Validar formato CBU (22 dígitos)
+        if (cbu == null || cbu.trim().isEmpty() || !cbu.matches("\\d{22}")) {
+            return ResponseEntity.badRequest().build();
+        }
+        
+        // Verificar que el CBU no esté en uso por otro usuario
+        Optional<Usuario> usuarioConCbu = usuarioRepository.findByCbu(cbu);
+        if (usuarioConCbu.isPresent() && !usuarioConCbu.get().getId().equals(usuario.getId())) {
+            return ResponseEntity.badRequest().build();
+        }
+        
+        usuario.setCbu(cbu);
+        usuarioRepository.save(usuario);
+        return ResponseEntity.ok(usuario);
+    }
+
+    // Eliminar CBU
+    @DeleteMapping("/cbu")
+    public ResponseEntity<Usuario> eliminarCbu(
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) return ResponseEntity.status(401).build();
+        
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty()) return ResponseEntity.status(401).build();
+        
+        Usuario usuario = usuarioOpt.get();
+        usuario.setCbu(null);
+        usuarioRepository.save(usuario);
         return ResponseEntity.ok(usuario);
     }
 } 

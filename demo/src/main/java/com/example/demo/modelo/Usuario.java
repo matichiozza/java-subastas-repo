@@ -55,6 +55,9 @@ public class Usuario implements UserDetails {
     @Column
     private double longitud;
 
+    @Column(unique = true, nullable = true)
+    private String cbu;
+
     @Enumerated(EnumType.STRING)
     private Role role;
 

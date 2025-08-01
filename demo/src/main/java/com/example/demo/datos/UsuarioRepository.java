@@ -12,5 +12,6 @@ public interface UsuarioRepository extends JpaRepository<Usuario, Integer> {
 
     Optional<Usuario> findByUsername(String username);
     Optional<Usuario> findByDni(String dni);
+    Optional<Usuario> findByCbu(String cbu);
     List<Usuario> findBySancionesDisponiblesLessThanEqual(int sanciones);
 }

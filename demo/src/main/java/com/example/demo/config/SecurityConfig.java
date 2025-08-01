@@ -38,7 +38,7 @@ public class SecurityConfig {
                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/publicaciones", "/publicaciones/**").permitAll()
                                 .requestMatchers(org.springframework.http.HttpMethod.GET, "/publicaciones/*/ofertas/usuario/*").permitAll()
                                 .requestMatchers(org.springframework.http.HttpMethod.DELETE, "/publicaciones/*/ofertas/usuario/*").authenticated()
-                                .requestMatchers("/tarjetas/**").permitAll()
+                                .requestMatchers("/tarjetas/**").authenticated()
                                 .anyRequest().authenticated()
                 )
                 .sessionManagement(sessionManager -> sessionManager.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
