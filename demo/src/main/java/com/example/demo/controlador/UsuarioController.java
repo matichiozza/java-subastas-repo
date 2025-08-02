@@ -1,7 +1,11 @@
 package com.example.demo.controlador;
 
+import com.example.demo.datos.OfertaRepository;
+import com.example.demo.datos.PublicacionRepository;
 import com.example.demo.datos.UsuarioRepository;
 import com.example.demo.modelo.CbuRequest;
+import com.example.demo.modelo.Oferta;
+import com.example.demo.modelo.Publicacion;
 import com.example.demo.modelo.Usuario;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
@@ -13,6 +17,8 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.Date;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -20,6 +26,8 @@ import java.util.Optional;
 @RequiredArgsConstructor
 public class UsuarioController {
     private final UsuarioRepository usuarioRepository;
+    private final PublicacionRepository publicacionRepository;
+    private final OfertaRepository ofertaRepository;
 
     // Actualizar datos personales (excepto foto de perfil y username)
     @PutMapping("/mis-datos")
@@ -158,5 +166,51 @@ public class UsuarioController {
         usuario.setCbu(null);
         usuarioRepository.save(usuario);
         return ResponseEntity.ok(usuario);
+    }
+
+    // Eliminar cuenta de usuario
+    @DeleteMapping("/eliminar-cuenta")
+    public ResponseEntity<?> eliminarCuenta(@AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).body("No autorizado");
+        }
+        
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Usuario no encontrado");
+        }
+        
+        Usuario usuario = usuarioOpt.get();
+        
+        // Verificar si tiene publicaciones activas
+        List<Publicacion> publicacionesActivas = publicacionRepository.findByUsuarioId(usuario.getId())
+                .stream()
+                .filter(pub -> "ACTIVO".equals(pub.getEstado()) && pub.getFechaFin().after(new Date()))
+                .toList();
+        
+        if (!publicacionesActivas.isEmpty()) {
+            return ResponseEntity.badRequest().body("No se puede eliminar la cuenta. Tienes " + 
+                    publicacionesActivas.size() + " subasta(s) activa(s). Debes finalizar o cancelar todas las subastas antes de eliminar tu cuenta.");
+        }
+        
+        // Verificar si tiene ofertas en subastas activas
+        List<Oferta> ofertasEnSubastasActivas = ofertaRepository.findByUsuarioId(usuario.getId())
+                .stream()
+                .filter(oferta -> "ACTIVO".equals(oferta.getPublicacion().getEstado()) && 
+                        oferta.getPublicacion().getFechaFin().after(new Date()))
+                .toList();
+        
+        if (!ofertasEnSubastasActivas.isEmpty()) {
+            return ResponseEntity.badRequest().body("No se puede eliminar la cuenta. Tienes " + 
+                    ofertasEnSubastasActivas.size() + " oferta(s) en subasta(s) activa(s). Debes esperar a que finalicen las subastas antes de eliminar tu cuenta.");
+        }
+        
+        // Si pasa todas las verificaciones, eliminar el usuario
+        try {
+            usuarioRepository.deleteById(usuario.getId());
+            return ResponseEntity.ok("Cuenta eliminada exitosamente");
+        } catch (Exception e) {
+            return ResponseEntity.status(500).body("Error al eliminar la cuenta: " + e.getMessage());
+        }
     }
 } 
