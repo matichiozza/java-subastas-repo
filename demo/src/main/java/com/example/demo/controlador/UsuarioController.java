@@ -3,6 +3,7 @@ package com.example.demo.controlador;
 import com.example.demo.datos.OfertaRepository;
 import com.example.demo.datos.PublicacionRepository;
 import com.example.demo.datos.UsuarioRepository;
+import com.example.demo.modelo.CambiarContrasenaRequest;
 import com.example.demo.modelo.CbuRequest;
 import com.example.demo.modelo.Oferta;
 import com.example.demo.modelo.Publicacion;
@@ -11,6 +12,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.core.userdetails.UserDetails;
+import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
@@ -28,6 +30,7 @@ public class UsuarioController {
     private final UsuarioRepository usuarioRepository;
     private final PublicacionRepository publicacionRepository;
     private final OfertaRepository ofertaRepository;
+    private final PasswordEncoder passwordEncoder;
 
     // Actualizar datos personales (excepto foto de perfil y username)
     @PutMapping("/mis-datos")
@@ -212,5 +215,43 @@ public class UsuarioController {
         } catch (Exception e) {
             return ResponseEntity.status(500).body("Error al eliminar la cuenta: " + e.getMessage());
         }
+    }
+
+    // Cambiar contraseña
+    @PutMapping("/cambiar-contrasena")
+    public ResponseEntity<?> cambiarContrasena(
+            @RequestBody CambiarContrasenaRequest request,
+            @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).body("No autorizado");
+        }
+        
+        Optional<Usuario> usuarioOpt = usuarioRepository.findByUsername(userDetails.getUsername());
+        if (usuarioOpt.isEmpty()) {
+            return ResponseEntity.status(404).body("Usuario no encontrado");
+        }
+        
+        Usuario usuario = usuarioOpt.get();
+        
+        // Verificar que la contraseña actual sea correcta
+        if (!passwordEncoder.matches(request.getContrasenaActual(), usuario.getPassword())) {
+            return ResponseEntity.badRequest().body("La contraseña actual es incorrecta");
+        }
+        
+        // Verificar que la nueva contraseña sea diferente a la actual
+        if (passwordEncoder.matches(request.getNuevaContrasena(), usuario.getPassword())) {
+            return ResponseEntity.badRequest().body("La nueva contraseña debe ser diferente a la actual");
+        }
+        
+        // Validar que la nueva contraseña tenga al menos 6 caracteres
+        if (request.getNuevaContrasena().length() < 6) {
+            return ResponseEntity.badRequest().body("La nueva contraseña debe tener al menos 6 caracteres");
+        }
+        
+        // Cambiar la contraseña
+        usuario.setPassword(passwordEncoder.encode(request.getNuevaContrasena()));
+        usuarioRepository.save(usuario);
+        
+        return ResponseEntity.ok("Contraseña cambiada exitosamente");
     }
 } 
