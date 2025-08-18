@@ -19,11 +19,13 @@ public class WebSocketConfig implements WebSocketMessageBrokerConfigurer {
     public void registerStompEndpoints(StompEndpointRegistry registry) {
         // Endpoint para WebSocket nativo
         registry.addEndpoint("/ws")
-                .setAllowedOrigins("http://localhost:3000");
+                .setAllowedOrigins("http://localhost:3000", "http://localhost:3001")
+                .setAllowedOriginPatterns("*");
         
         // Endpoint para SockJS (fallback)
         registry.addEndpoint("/ws-sockjs")
-                .setAllowedOrigins("http://localhost:3000")
+                .setAllowedOrigins("http://localhost:3000", "http://localhost:3001")
+                .setAllowedOriginPatterns("*")
                 .withSockJS();
     }
 } 

@@ -3,6 +3,7 @@ package com.example.demo.controlador;
 import com.example.demo.datos.PublicacionRepository;
 import com.example.demo.datos.UsuarioRepository;
 import com.example.demo.datos.OfertaRepository;
+import com.example.demo.datos.ChatRepository;
 import com.example.demo.modelo.Publicacion;
 import com.example.demo.modelo.Usuario;
 import com.example.demo.modelo.PublicacionRequest;
@@ -11,6 +12,7 @@ import com.example.demo.modelo.OfertaRequest;
 import com.example.demo.modelo.OfertaResponse;
 import com.example.demo.modelo.CancelacionRequest;
 import com.example.demo.modelo.MotivoCancelacion;
+import com.example.demo.modelo.Chat;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -35,6 +37,7 @@ public class PublicacionController {
     private final PublicacionRepository publicacionRepository;
     private final UsuarioRepository usuarioRepository;
     private final OfertaRepository ofertaRepository;
+    private final ChatRepository chatRepository;
     private final SimpMessagingTemplate messagingTemplate;
 
     @PostMapping(consumes = {"multipart/form-data"})
@@ -430,6 +433,84 @@ public class PublicacionController {
             "usuariosEliminados", usuariosEliminados,
             "usuariosEncontrados", usuariosSinSanciones.size()
         ));
+    }
+
+    @PostMapping("/{id}/finalizar")
+    public ResponseEntity<?> finalizarPublicacion(@PathVariable Integer id, @AuthenticationPrincipal UserDetails userDetails) {
+        if (userDetails == null) {
+            return ResponseEntity.status(401).build();
+        }
+        
+        Optional<Publicacion> pubOpt = publicacionRepository.findById(id);
+        if (pubOpt.isEmpty()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        Publicacion pub = pubOpt.get();
+        // Solo el dueño puede finalizar
+        if (pub.getUsuario() == null || !pub.getUsuario().getUsername().equals(userDetails.getUsername())) {
+            return ResponseEntity.status(403).build();
+        }
+        
+        // Verificar que esté activa
+        if (!"ACTIVO".equals(pub.getEstado())) {
+            return ResponseEntity.badRequest().body(Map.of("error", "La publicación ya no está activa"));
+        }
+        
+        // Obtener ofertas para determinar ganador
+        List<Oferta> ofertas = ofertaRepository.findByPublicacionIdOrderByFechaDesc(id);
+        
+        if (ofertas.isEmpty()) {
+            // No hay ofertas, simplemente cerrar la subasta
+            pub.setEstado("FINALIZADO_SIN_OFERTAS");
+            publicacionRepository.save(pub);
+            
+            return ResponseEntity.ok(Map.of(
+                "mensaje", "Subasta finalizada sin ofertas",
+                "publicacion", pub,
+                "ganador", null
+            ));
+        }
+        
+        // Determinar ganador (mayor oferta)
+        Oferta ofertaGanadora = ofertas.get(0); // Ya está ordenado por fecha desc, pero necesitamos por monto
+        for (Oferta oferta : ofertas) {
+            if (oferta.getMonto() > ofertaGanadora.getMonto()) {
+                ofertaGanadora = oferta;
+            }
+        }
+        
+        // Actualizar publicación
+        pub.setEstado("FINALIZADO");
+        pub.setGanador(ofertaGanadora.getUsuario());
+        pub.setFechaFin(new Date()); // Actualizar fecha de fin a ahora
+        publicacionRepository.save(pub);
+        
+        // Crear chat entre vendedor y ganador
+        Chat chat = new Chat(pub, pub.getUsuario(), ofertaGanadora.getUsuario());
+        chatRepository.save(chat);
+        
+        // Preparar respuesta con datos del ganador
+        Map<String, Object> response = Map.of(
+            "mensaje", "Subasta finalizada exitosamente",
+            "publicacion", pub,
+            "ganador", Map.of(
+                "id", ofertaGanadora.getUsuario().getId(),
+                "nombre", ofertaGanadora.getUsuario().getNombre(),
+                "username", ofertaGanadora.getUsuario().getUsername(),
+                "fotoPerfil", ofertaGanadora.getUsuario().getFotoPerfil(),
+                "ciudad", ofertaGanadora.getUsuario().getCiudad(),
+                "pais", ofertaGanadora.getUsuario().getPais()
+            ),
+            "ofertaGanadora", Map.of(
+                "monto", ofertaGanadora.getMonto(),
+                "fecha", ofertaGanadora.getFecha()
+            ),
+            "totalOfertas", ofertas.size(),
+            "chatId", chat.getId()
+        );
+        
+        return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{id}")
