@@ -10,6 +10,7 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Optional;
@@ -41,6 +42,12 @@ public class AuthController {
         }
         Optional<Usuario> usuario = usuarioRepository.findByUsername(userDetails.getUsername());
         return usuario.map(ResponseEntity::ok).orElseGet(() -> ResponseEntity.notFound().build());
+    }
+
+    @GetMapping("/check-username")
+    public ResponseEntity<Boolean> checkUsernameAvailability(@RequestParam String username) {
+        boolean isAvailable = !usuarioRepository.findByUsername(username).isPresent();
+        return ResponseEntity.ok(isAvailable);
     }
 }
 
