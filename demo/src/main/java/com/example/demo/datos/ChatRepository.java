@@ -11,9 +11,13 @@ import java.util.Optional;
 
 @Repository
 public interface ChatRepository extends JpaRepository<Chat, Integer> {
-    Optional<Chat> findByPublicacionId(Integer publicacionId);
+    @Query("SELECT DISTINCT c FROM Chat c LEFT JOIN FETCH c.vendedor LEFT JOIN FETCH c.ganador LEFT JOIN FETCH c.publicacion WHERE c.publicacion.id = :publicacionId")
+    Optional<Chat> findByPublicacionIdWithRelations(@Param("publicacionId") Integer publicacionId);
     
-    @Query("SELECT c FROM Chat c WHERE c.vendedor.id = :usuarioId OR c.ganador.id = :usuarioId ORDER BY c.fechaCreacion DESC")
+    @Query("SELECT c FROM Chat c LEFT JOIN FETCH c.vendedor LEFT JOIN FETCH c.ganador LEFT JOIN FETCH c.publicacion WHERE c.publicacion.id = :publicacionId AND (c.vendedor.id = :usuarioId OR c.ganador.id = :usuarioId)")
+    Optional<Chat> findByPublicacionIdAndUsuarioIdWithRelations(@Param("publicacionId") Integer publicacionId, @Param("usuarioId") Integer usuarioId);
+    
+    @Query("SELECT c FROM Chat c LEFT JOIN FETCH c.vendedor LEFT JOIN FETCH c.ganador WHERE c.vendedor.id = :usuarioId OR c.ganador.id = :usuarioId ORDER BY c.fechaCreacion DESC")
     List<Chat> findByVendedorIdOrGanadorIdOrderByFechaCreacionDesc(@Param("usuarioId") Integer usuarioId);
 
     // Método para verificar acceso a un chat específico

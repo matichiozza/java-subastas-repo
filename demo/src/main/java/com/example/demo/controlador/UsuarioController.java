@@ -31,6 +31,7 @@ public class UsuarioController {
     private final PublicacionRepository publicacionRepository;
     private final OfertaRepository ofertaRepository;
     private final PasswordEncoder passwordEncoder;
+    private final com.example.demo.servicio.SupabaseStorageService supabaseStorageService;
 
     // Actualizar datos personales (excepto foto de perfil y username)
     @PutMapping("/mis-datos")
@@ -101,23 +102,17 @@ public class UsuarioController {
             return ResponseEntity.badRequest().build();
         }
         
-        // Guardar imagen
-        String nombreArchivo = System.currentTimeMillis() + "_" + StringUtils.cleanPath(fotoPerfil.getOriginalFilename());
-        String rutaRelativa = "/uploads/" + nombreArchivo;
-        String uploadDir = System.getProperty("user.dir") + File.separator + "uploads";
-        String rutaAbsoluta = uploadDir + File.separator + nombreArchivo;
+        // Guardar imagen en Supabase
+        String imageUrl = null;
+        try {
+            imageUrl = supabaseStorageService.uploadFile(fotoPerfil);
+            System.out.println("Archivo guardado exitosamente en Supabase: " + imageUrl);
+        } catch (IOException e) {
+            e.printStackTrace();
+            return ResponseEntity.status(500).build();
+        }
         
-        System.out.println("Guardando archivo:");
-        System.out.println("- Ruta relativa: " + rutaRelativa);
-        System.out.println("- Ruta absoluta: " + rutaAbsoluta);
-        
-        File dest = new File(rutaAbsoluta);
-        dest.getParentFile().mkdirs();
-        fotoPerfil.transferTo(dest);
-        
-        System.out.println("Archivo guardado exitosamente");
-        
-        usuario.setFotoPerfil(rutaRelativa);
+        usuario.setFotoPerfil(imageUrl);
         usuarioRepository.save(usuario);
         
         System.out.println("Usuario actualizado con nueva foto: " + usuario.getFotoPerfil());

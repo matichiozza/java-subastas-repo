@@ -4,6 +4,7 @@ import com.example.demo.datos.PublicacionRepository;
 import com.example.demo.datos.UsuarioRepository;
 import com.example.demo.datos.OfertaRepository;
 import com.example.demo.datos.ChatRepository;
+import com.example.demo.datos.MensajeRepository;
 import com.example.demo.modelo.Publicacion;
 import com.example.demo.modelo.Usuario;
 import com.example.demo.modelo.PublicacionRequest;
@@ -13,6 +14,7 @@ import com.example.demo.modelo.OfertaResponse;
 import com.example.demo.modelo.CancelacionRequest;
 import com.example.demo.modelo.MotivoCancelacion;
 import com.example.demo.modelo.Chat;
+import com.example.demo.modelo.Mensaje;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -24,6 +26,7 @@ import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -38,7 +41,9 @@ public class PublicacionController {
     private final UsuarioRepository usuarioRepository;
     private final OfertaRepository ofertaRepository;
     private final ChatRepository chatRepository;
+    private final MensajeRepository mensajeRepository;
     private final SimpMessagingTemplate messagingTemplate;
+    private final com.example.demo.servicio.SupabaseStorageService supabaseStorageService;
 
     @PostMapping(consumes = {"multipart/form-data"})
     public ResponseEntity<Publicacion> crearPublicacion(
@@ -81,14 +86,13 @@ public class PublicacionController {
                     if (file.getSize() > MAX_SIZE) {
                         return ResponseEntity.badRequest().body(null);
                     }
-                    String nombreArchivo = System.currentTimeMillis() + "_" + StringUtils.cleanPath(file.getOriginalFilename());
-                    String rutaRelativa = "/uploads/" + nombreArchivo;
-                    String uploadDir = System.getProperty("user.dir") + File.separator + "uploads";
-                    String rutaAbsoluta = uploadDir + File.separator + nombreArchivo;
-                    File dest = new File(rutaAbsoluta);
-                    dest.getParentFile().mkdirs();
-                    file.transferTo(dest);
-                    rutasImagenes.add(rutaRelativa);
+                    try {
+                        String imageUrl = supabaseStorageService.uploadFile(file);
+                        rutasImagenes.add(imageUrl);
+                    } catch (IOException e) {
+                        e.printStackTrace();
+                        return ResponseEntity.status(500).body(null);
+                    }
                 }
             }
         }
@@ -322,9 +326,7 @@ public class PublicacionController {
         if (pub.getImagenes() != null) {
             for (String ruta : pub.getImagenes()) {
                 try {
-                    String absPath = System.getProperty("user.dir") + ruta.replace("/", File.separator);
-                    File f = new File(absPath);
-                    if (f.exists()) f.delete();
+                    supabaseStorageService.deleteFile(ruta);
                 } catch (Exception ignored) {}
             }
         }
@@ -465,11 +467,11 @@ public class PublicacionController {
             pub.setEstado("FINALIZADO_SIN_OFERTAS");
             publicacionRepository.save(pub);
             
-            return ResponseEntity.ok(Map.of(
-                "mensaje", "Subasta finalizada sin ofertas",
-                "publicacion", pub,
-                "ganador", null
-            ));
+            Map<String, Object> responseSinOfertas = new HashMap<>();
+            responseSinOfertas.put("mensaje", "Subasta finalizada sin ofertas");
+            responseSinOfertas.put("publicacion", pub);
+            responseSinOfertas.put("ganador", null);
+            return ResponseEntity.ok(responseSinOfertas);
         }
         
         // Determinar ganador (mayor oferta)
@@ -491,24 +493,25 @@ public class PublicacionController {
         chatRepository.save(chat);
         
         // Preparar respuesta con datos del ganador
-        Map<String, Object> response = Map.of(
-            "mensaje", "Subasta finalizada exitosamente",
-            "publicacion", pub,
-            "ganador", Map.of(
-                "id", ofertaGanadora.getUsuario().getId(),
-                "nombre", ofertaGanadora.getUsuario().getNombre(),
-                "username", ofertaGanadora.getUsuario().getUsername(),
-                "fotoPerfil", ofertaGanadora.getUsuario().getFotoPerfil(),
-                "ciudad", ofertaGanadora.getUsuario().getCiudad(),
-                "pais", ofertaGanadora.getUsuario().getPais()
-            ),
-            "ofertaGanadora", Map.of(
-                "monto", ofertaGanadora.getMonto(),
-                "fecha", ofertaGanadora.getFecha()
-            ),
-            "totalOfertas", ofertas.size(),
-            "chatId", chat.getId()
-        );
+        Map<String, Object> ganadorData = new HashMap<>();
+        ganadorData.put("id", ofertaGanadora.getUsuario().getId());
+        ganadorData.put("nombre", ofertaGanadora.getUsuario().getNombre());
+        ganadorData.put("username", ofertaGanadora.getUsuario().getUsername());
+        ganadorData.put("fotoPerfil", ofertaGanadora.getUsuario().getFotoPerfil());
+        ganadorData.put("ciudad", ofertaGanadora.getUsuario().getCiudad());
+        ganadorData.put("pais", ofertaGanadora.getUsuario().getPais());
+        
+        Map<String, Object> ofertaData = new HashMap<>();
+        ofertaData.put("monto", ofertaGanadora.getMonto());
+        ofertaData.put("fecha", ofertaGanadora.getFecha());
+        
+        Map<String, Object> response = new HashMap<>();
+        response.put("mensaje", "Subasta finalizada exitosamente");
+        response.put("publicacion", pub);
+        response.put("ganador", ganadorData);
+        response.put("ofertaGanadora", ofertaData);
+        response.put("totalOfertas", ofertas.size());
+        response.put("chatId", chat.getId());
         
         return ResponseEntity.ok(response);
     }
@@ -533,18 +536,34 @@ public class PublicacionController {
             ofertaRepository.deleteAll(ofertasAEliminar);
         }
         
+        // Eliminar chats y mensajes asociados a la publicación
+        Optional<Chat> chatOpt = chatRepository.findByPublicacionIdWithRelations(id);
+        if (chatOpt.isPresent()) {
+            Chat chat = chatOpt.get();
+            // Eliminar todos los mensajes del chat primero
+            try {
+                List<Mensaje> mensajes = mensajeRepository.findByChatIdOrderByFechaEnvio(chat.getId());
+                if (!mensajes.isEmpty()) {
+                    mensajeRepository.deleteAll(mensajes);
+                }
+            } catch (Exception e) {
+                // Si falla, intentar eliminar directamente por chatId si existe el método
+                // Si no existe, continuar con la eliminación del chat
+            }
+            // Eliminar el chat
+            chatRepository.delete(chat);
+        }
+        
         // Borrar imágenes del disco
         if (pub.getImagenes() != null) {
             for (String ruta : pub.getImagenes()) {
                 try {
-                    String absPath = System.getProperty("user.dir") + ruta.replace("/", File.separator);
-                    File f = new File(absPath);
-                    if (f.exists()) f.delete();
+                    supabaseStorageService.deleteFile(ruta);
                 } catch (Exception ignored) {}
             }
         }
         
-        // Ahora eliminar la publicación (ya no hay ofertas que la referencien)
+        // Ahora eliminar la publicación (ya no hay ofertas ni chats que la referencien)
         publicacionRepository.deleteById(id);
         return ResponseEntity.noContent().build();
     }

@@ -177,20 +177,21 @@ public class ChatController {
             return ResponseEntity.status(401).build();
         }
         
-        Optional<Chat> chatOpt = chatRepository.findByPublicacionId(publicacionId);
+        Usuario usuario = usuarioOpt.get();
+        Integer usuarioId = usuario.getId();
+        
+        // Buscar el chat por publicación y verificar acceso en la misma consulta
+        Optional<Chat> chatOpt = chatRepository.findByPublicacionIdAndUsuarioIdWithRelations(publicacionId, usuarioId);
+        
         if (chatOpt.isEmpty()) {
+            // Si no se encuentra con acceso, verificar si existe pero sin acceso
+            Optional<Chat> chatSinAcceso = chatRepository.findByPublicacionIdWithRelations(publicacionId);
+            if (chatSinAcceso.isPresent()) {
+                return ResponseEntity.status(403).build();
+            }
             return ResponseEntity.notFound().build();
         }
         
-        Chat chat = chatOpt.get();
-        Usuario usuario = usuarioOpt.get();
-        
-        // Verificar que el usuario sea parte del chat
-        if (!chat.getVendedor().getId().equals(usuario.getId()) && 
-            !chat.getGanador().getId().equals(usuario.getId())) {
-            return ResponseEntity.status(403).build();
-        }
-        
-        return ResponseEntity.ok(chat);
+        return ResponseEntity.ok(chatOpt.get());
     }
 }
