@@ -31,3 +31,6 @@ build/
 
 ### VS Code ###
 .vscode/
+
+### Scripts (migración Node) ###
+scripts/node_modules/
